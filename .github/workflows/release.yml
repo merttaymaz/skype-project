@@ -88,7 +88,7 @@ jobs:
 
       - name: Build JAR (for Docker)
         working-directory: ${{ matrix.project.path }}
-        run: ./gradlew bootJar -x test --no-daemon
+        run: gradle bootJar -x test --no-daemon
 
       - name: Extract tag version
         id: version
