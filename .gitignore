@@ -5,6 +5,8 @@ bin/
 out/
 *.class
 *.jar
+!gradle/wrapper/gradle-wrapper.jar
+!sfb-ucwa-spring/gradle/wrapper/gradle-wrapper.jar
 *.war
 
 # .NET
