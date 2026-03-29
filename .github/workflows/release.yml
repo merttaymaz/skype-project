@@ -47,7 +47,7 @@ jobs:
       - name: Build ${{ matrix.project.name }}
         working-directory: ${{ matrix.project.path }}
         run: |
-          ./gradlew bootJar -x test --no-daemon
+          gradle bootJar -x test --no-daemon
           echo "✅ ${{ matrix.project.name }} build basarili"
 
       - name: Upload JAR artifact
