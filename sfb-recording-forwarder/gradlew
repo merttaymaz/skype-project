@@ -155,15 +155,20 @@ if "$cygwin" || "$msys" ; then
 fi
 
 
-# Add default JVM options here. You can also use JAVA_OPTS and GRADLE_OPTS to pass JVM options to this script.
+# Save original Gradle args before JVM opts processing modifies $@
+APP_ARGS=( "$@" )
+
+# Collect JVM options only (DEFAULT_JVM_OPTS, JAVA_OPTS, GRADLE_OPTS)
 eval "set -- $(
         printf '%s\n' "$DEFAULT_JVM_OPTS $JAVA_OPTS $GRADLE_OPTS" |
         xargs -n1 |
         sed ' s~[^-[:alnum:]+,./:=@_]~\\&~g; ' |
         tr '\n' ' '
-    )" '"$@"'
+    )"
 
+# $@ now contains only JVM opts; APP_ARGS contains the original Gradle task args
 exec "$JAVACMD" "$@" \
     -classpath "$CLASSPATH" \
     -Dorg.gradle.appname="$APP_BASE_NAME" \
-    org.gradle.wrapper.GradleWrapperMain "$@"
+    org.gradle.wrapper.GradleWrapperMain \
+    "${APP_ARGS[@]}"
