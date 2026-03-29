@@ -1,0 +1,40 @@
+version: "3.9"
+
+services:
+  sfb-ucwa-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sfb-ucwa-spring
+    ports:
+      - "8443:8443"
+    environment:
+      - SPRING_PROFILES_ACTIVE=dev
+      - SFB_AUTODISCOVER_URL=${SFB_AUTODISCOVER_URL:-https://lyncdiscover.yourdomain.com}
+      - SFB_TOKEN_URL=${SFB_TOKEN_URL:-https://adfs.yourdomain.com/adfs/oauth2/token}
+      - SFB_CLIENT_ID=${SFB_CLIENT_ID:-your-client-id}
+      - SFB_CLIENT_SECRET=${SFB_CLIENT_SECRET:-your-client-secret}
+      - SFB_RESOURCE=${SFB_RESOURCE:-https://lyncdiscover.yourdomain.com}
+      - RECORDING_ENABLED=${RECORDING_ENABLED:-true}
+      - RECORDING_WATCH_DIR=/mnt/sfb-recordings
+      - STT_SERVICE_URL=${STT_SERVICE_URL:-http://host.docker.internal:8000/v1/audio/transcriptions}
+      - STT_API_KEY=${STT_API_KEY:-}
+      - STT_LANGUAGE=${STT_LANGUAGE:-tr}
+      - STT_MODEL=${STT_MODEL:-whisper-large-v3}
+      - JAVA_OPTS=-XX:MaxRAMPercentage=75.0
+    volumes:
+      - ./logs:/app/logs
+      - ${RECORDING_HOST_DIR:-./recordings}:/mnt/sfb-recordings
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8443/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - sfb-network
+
+networks:
+  sfb-network:
+    driver: bridge

@@ -1,0 +1,72 @@
+server:
+  port: 8480
+
+spring:
+  application:
+    name: sfb-recording-forwarder
+  threads:
+    virtual:
+      enabled: true   # Tomcat da Virtual Threads kullansin
+  jackson:
+    default-property-inclusion: non_null
+    serialization:
+      write-dates-as-timestamps: false
+
+# ──── Recording Forwarder Konfigurasyonu ────
+recording:
+  # SfB compliance recording cikti dizini
+  watch-directory: ${RECORDING_WATCH_DIR:/mnt/sfb-recordings}
+  processed-directory: ${RECORDING_PROCESSED_DIR:/mnt/sfb-recordings/processed}
+  failed-directory: ${RECORDING_FAILED_DIR:/mnt/sfb-recordings/failed}
+
+  # Desteklenen formatlar
+  supported-extensions:
+    - .wav
+    - .wma
+    - .mp4
+    - .pcm
+
+  # Tarama araligi (ISO 8601 duration)
+  scan-interval: PT10S
+
+  # Dosya yazim stabilite bekleme suresi
+  file-stability-delay: PT5S
+
+  # STT servisine max paralel gonderim
+  max-concurrent-processing: ${STT_MAX_CONCURRENT:10}
+
+  # ──── External STT Servisi ────
+  stt-service-url: ${STT_SERVICE_URL:http://localhost:9090}
+  stt-endpoint-path: ${STT_ENDPOINT_PATH:/api/v1/transcribe}
+  stt-api-key: ${STT_API_KEY:}
+  stt-timeout: PT5M
+  stt-max-retries: 3
+
+  # Dosya tasima politikasi
+  move-processed-files: true
+  move-failed-files: true
+
+# ──── Actuator ────
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+
+# ──── Logging ────
+logging:
+  level:
+    root: INFO
+    com.databoss.sfbrec: DEBUG
+  pattern:
+    console: "%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+
+# ──── Swagger ────
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html

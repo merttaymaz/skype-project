@@ -1,0 +1,308 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+env:
+  JAVA_VERSION: '21'
+  GRADLE_VERSION: '8.10.2'
+
+jobs:
+  # ────────────────────────────────────────────────────
+  # 1. Java projeleri build (Linux)
+  # ────────────────────────────────────────────────────
+  build-java:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        project:
+          - name: sfb-ucwa-spring
+            path: sfb-ucwa-spring
+            jar: sfb-ucwa-spring.jar
+          - name: sfb-recording-forwarder
+            path: sfb-recording-forwarder
+            jar: sfb-recording-forwarder.jar
+          - name: sfb-realtime-stt
+            path: sfb-realtime-stt/spring-app
+            jar: sfb-realtime-stt.jar
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: temurin
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build ${{ matrix.project.name }}
+        working-directory: ${{ matrix.project.path }}
+        run: |
+          gradle bootJar -x test --no-daemon
+          echo "✅ ${{ matrix.project.name }} build basarili"
+
+      - name: Upload JAR artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.project.name }}
+          path: ${{ matrix.project.path }}/build/libs/*.jar
+          retention-days: 5
+
+  # ────────────────────────────────────────────────────
+  # 2. Docker image build
+  # ────────────────────────────────────────────────────
+  build-docker:
+    runs-on: ubuntu-latest
+    needs: build-java
+    strategy:
+      matrix:
+        project:
+          - name: sfb-ucwa-spring
+            path: sfb-ucwa-spring
+            image: sfb-ucwa-spring
+          - name: sfb-recording-forwarder
+            path: sfb-recording-forwarder
+            image: sfb-recording-forwarder
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: temurin
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build JAR (for Docker)
+        working-directory: ${{ matrix.project.path }}
+        run: gradle bootJar -x test --no-daemon
+
+      - name: Extract tag version
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        working-directory: ${{ matrix.project.path }}
+        run: |
+          docker build \
+            -t ${{ matrix.project.image }}:${{ steps.version.outputs.VERSION }} \
+            -t ${{ matrix.project.image }}:latest \
+            .
+          echo "✅ Docker image: ${{ matrix.project.image }}:${{ steps.version.outputs.VERSION }}"
+
+      # ── Opsiyonel: Registry'ye push ──
+      # Kendi registry'niz varsa asagidaki blogu aktif edin:
+      #
+      # - name: Login to Registry
+      #   uses: docker/login-action@v3
+      #   with:
+      #     registry: registry.data-boss.com.tr
+      #     username: ${{ secrets.REGISTRY_USER }}
+      #     password: ${{ secrets.REGISTRY_PASSWORD }}
+      #
+      # - name: Push Docker image
+      #   run: |
+      #     docker tag ${{ matrix.project.image }}:${{ steps.version.outputs.VERSION }} \
+      #       registry.data-boss.com.tr/${{ matrix.project.image }}:${{ steps.version.outputs.VERSION }}
+      #     docker push registry.data-boss.com.tr/${{ matrix.project.image }}:${{ steps.version.outputs.VERSION }}
+
+  # ────────────────────────────────────────────────────
+  # 3. GitHub Release olustur
+  # ────────────────────────────────────────────────────
+  release:
+    runs-on: ubuntu-latest
+    needs: [build-java, build-docker]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Tum git gecmisi (release notes icin)
+
+      - name: Extract tag version
+        id: version
+        run: |
+          echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      - name: Organize release assets
+        run: |
+          mkdir -p release-assets
+          # JAR dosyalarini topla
+          for project in sfb-ucwa-spring sfb-recording-forwarder sfb-realtime-stt; do
+            if [ -d "artifacts/$project" ]; then
+              cp artifacts/$project/*.jar "release-assets/${project}-${{ steps.version.outputs.VERSION }}.jar" 2>/dev/null || true
+            fi
+          done
+          ls -la release-assets/
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # Onceki tag'i bul
+          PREV_TAG=$(git tag --sort=-creatordate | head -2 | tail -1)
+          if [ "$PREV_TAG" = "${{ steps.version.outputs.TAG }}" ] || [ -z "$PREV_TAG" ]; then
+            # Ilk release — tum commit'leri al
+            CHANGES=$(git log --pretty=format:"- %s (%h)" HEAD)
+          else
+            CHANGES=$(git log --pretty=format:"- %s (%h)" ${PREV_TAG}..HEAD)
+          fi
+          echo "CHANGES<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.TAG }}
+          name: "Release ${{ steps.version.outputs.TAG }}"
+          files: release-assets/*
+          body: |
+            # 🚀 SfB Platform — Release ${{ steps.version.outputs.TAG }}
+
+            ## Artifacts
+
+            | Proje | Dosya | Aciklama |
+            |---|---|---|
+            | **sfb-ucwa-spring** | `sfb-ucwa-spring-${{ steps.version.outputs.VERSION }}.jar` | UCWA entegrasyon servisi |
+            | **sfb-recording-forwarder** | `sfb-recording-forwarder-${{ steps.version.outputs.VERSION }}.jar` | Batch STT pipeline |
+            | **sfb-realtime-stt** | `sfb-realtime-stt-${{ steps.version.outputs.VERSION }}.jar` | Realtime STT pipeline (Spring app) |
+            | **sfb-audio-bridge** | *Manuel build gerekli* | .NET UCMA bot (Windows) |
+
+            > **Not:** `sfb-audio-bridge` .NET Framework 4.8 + UCMA 5.0 SDK gerektirdiginden CI'da build edilemez.
+            > Windows ortaminda manuel build yapin (bkz. Deploy Rehberi).
+
+            ---
+
+            ## Changelog
+
+            ${{ steps.changelog.outputs.CHANGES }}
+
+            ---
+
+            ## 📦 Deploy Rehberi
+
+            ### 1. sfb-ucwa-spring
+
+            ```bash
+            # JAR ile calistirma
+            export SFB_AUTODISCOVER_URL=https://lyncdiscover.yourdomain.com
+            export SFB_TOKEN_URL=https://adfs.yourdomain.com/adfs/oauth2/token
+            export SFB_CLIENT_ID=your-client-id
+            export SFB_CLIENT_SECRET=your-client-secret
+            export SFB_RESOURCE=https://lyncdiscover.yourdomain.com
+            java -jar sfb-ucwa-spring-${{ steps.version.outputs.VERSION }}.jar --spring.profiles.active=dev
+
+            # Docker ile
+            docker run -d -p 8443:8443 \
+              -e SPRING_PROFILES_ACTIVE=dev \
+              -e SFB_AUTODISCOVER_URL=https://lyncdiscover.yourdomain.com \
+              -e SFB_TOKEN_URL=https://adfs.yourdomain.com/adfs/oauth2/token \
+              -e SFB_CLIENT_ID=your-client-id \
+              -e SFB_CLIENT_SECRET=your-client-secret \
+              sfb-ucwa-spring:${{ steps.version.outputs.VERSION }}
+
+            # Kubernetes
+            kubectl create secret generic sfb-ucwa-secrets --namespace=sfb \
+              --from-literal=autodiscover-url='https://lyncdiscover.yourdomain.com' \
+              --from-literal=token-url='https://adfs.yourdomain.com/adfs/oauth2/token' \
+              --from-literal=client-id='your-client-id' \
+              --from-literal=client-secret='your-client-secret' \
+              --from-literal=resource='https://lyncdiscover.yourdomain.com'
+            kubectl apply -f sfb-ucwa-spring/k8s/deployment.yaml
+            ```
+
+            ### 2. sfb-recording-forwarder
+
+            ```bash
+            # JAR ile
+            STT_SERVICE_URL=http://your-stt:9090 \
+            RECORDING_WATCH_DIR=/mnt/sfb-recordings \
+            java -jar sfb-recording-forwarder-${{ steps.version.outputs.VERSION }}.jar
+
+            # Docker Compose ile
+            cd sfb-recording-forwarder
+            cp .env.example .env  # STT ayarlarini duzenle
+            docker-compose up -d
+            ```
+
+            ### 3. sfb-realtime-stt (Spring App)
+
+            ```bash
+            # JAR ile
+            STT_SERVICE_URL=http://your-stt:9090 \
+            java -jar sfb-realtime-stt-${{ steps.version.outputs.VERSION }}.jar
+
+            # Spring app WebSocket endpoint: ws://host:8480/ws/audio-stream
+            ```
+
+            ### 4. sfb-audio-bridge (.NET — Manuel Build)
+
+            ```powershell
+            # 1. Windows Server'da build et
+            msbuild SfbAudioBridge.csproj /p:Configuration=Release
+
+            # 2. Deploy
+            .\Deploy-SfbAudioBridge.ps1 -Action install `
+                -PoolFqdn "sfb-audio-pool.yourdomain.com" `
+                -Registrar "sfbfe01.yourdomain.com" `
+                -CertSubject "sfb-audio-pool.yourdomain.com" `
+                -BuildDir ".\bin\Release"
+
+            # 3. Service baslat
+            net start SfbAudioBridge
+            ```
+
+            ### Dogrulama
+
+            ```bash
+            # sfb-ucwa-spring
+            curl http://localhost:8443/actuator/health
+            curl -X POST http://localhost:8443/api/v1/ucwa/bootstrap
+
+            # sfb-recording-forwarder
+            curl http://localhost:8480/api/v1/recordings/stats
+
+            # sfb-realtime-stt
+            curl http://localhost:8480/api/v1/stream/stats
+
+            # sfb-audio-bridge (Windows)
+            Get-Service SfbAudioBridge
+            ```
+
+            ---
+
+            ## Gereksinimler
+
+            | Bilesen | Minimum |
+            |---|---|
+            | JDK | 21 (Temurin/Corretto) |
+            | Docker | 24+ |
+            | Kubernetes | 1.28+ (opsiyonel) |
+            | .NET Framework | 4.8 (sadece audio-bridge) |
+            | UCMA SDK | 5.0 (sadece audio-bridge) |
+            | SfB Server | 2015/2019 |
+          generate_release_notes: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

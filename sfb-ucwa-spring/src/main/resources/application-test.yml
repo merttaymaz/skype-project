@@ -1,0 +1,23 @@
+spring:
+  config:
+    activate:
+      on-profile: test
+
+sfb:
+  ucwa:
+    autodiscover-url: http://localhost:9999/Autodiscover
+    token-url: http://localhost:9999/token
+    client-id: test-client-id
+    client-secret: test-client-secret
+    resource: http://localhost:9999
+    trust-all-certificates: true
+
+sfb:
+  recording:
+    enabled: false
+    watch-dir: /tmp/sfb-test-recordings
+    stt-service-url: http://localhost:9999/v1/audio/transcriptions
+
+logging:
+  level:
+    com.databoss.sfbucwa: DEBUG

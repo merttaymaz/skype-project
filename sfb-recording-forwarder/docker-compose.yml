@@ -1,0 +1,32 @@
+version: "3.9"
+
+services:
+  sfb-recording-forwarder:
+    build: .
+    container_name: sfb-recording-forwarder
+    ports:
+      - "8480:8480"
+    environment:
+      - RECORDING_WATCH_DIR=/mnt/sfb-recordings
+      - STT_SERVICE_URL=http://mock-stt:9090
+      - STT_ENDPOINT_PATH=/api/v1/transcribe
+      - STT_MAX_CONCURRENT=10
+    volumes:
+      # SfB compliance recording dizini — NFS/SMB mount veya host path
+      - ./test-recordings:/mnt/sfb-recordings
+    depends_on:
+      - mock-stt
+    restart: unless-stopped
+
+  # ─── Mock STT Servisi (test icin) ───
+  # Gercek ortamda bunu kaldirip gercek STT URL'sini kullanin
+  mock-stt:
+    image: python:3.12-slim
+    container_name: mock-stt
+    ports:
+      - "9090:9090"
+    command: >
+      bash -c "pip install flask && python /app/mock_stt.py"
+    volumes:
+      - ./docker/mock_stt.py:/app/mock_stt.py
+    restart: unless-stopped

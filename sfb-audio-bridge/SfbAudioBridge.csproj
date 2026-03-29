@@ -1,0 +1,55 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <!-- UCMA 5.0 SDK sadece .NET Framework 4.8 destekler — .NET 6/8 DEGIL -->
+    <TargetFramework>net48</TargetFramework>
+    <AssemblyName>SfbAudioBridge</AssemblyName>
+    <RootNamespace>SfbAudioBridge</RootNamespace>
+    <Company>DataBoss</Company>
+    <Description>SfB UCMA Audio Bridge — Meeting audio stream to Spring Boot via WebSocket</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      UCMA 5.0 SDK DLL'leri — NuGet'te YOK.
+      SfB Server 2015/2019 SDK kurulumundan alinir:
+
+      Kurulum:
+        1. "Skype for Business Server 2019" ISO'dan "UcmaSdk.msi" calistir
+           VEYA SfB 2015 icin "UcmaRuntimeSetup.exe" + "UcmaSdk.msi"
+        2. Kurulum dizini: C:\Program Files\Microsoft UCMA 5.0\SDK\Core\
+
+      Sonra bu DLL'leri projenin lib/ klasorune kopyala:
+        - Microsoft.Rtc.Collaboration.dll
+        - Microsoft.Rtc.Signaling.dll
+        - Microsoft.Rtc.Internal.dll
+
+      VEYA SDK kurulu makinede dogrudan referans ver (asagidaki gibi).
+    -->
+    <Reference Include="Microsoft.Rtc.Collaboration">
+      <HintPath>lib\Microsoft.Rtc.Collaboration.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.Rtc.Signaling">
+      <HintPath>lib\Microsoft.Rtc.Signaling.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.Rtc.Internal">
+      <HintPath>lib\Microsoft.Rtc.Internal.dll</HintPath>
+    </Reference>
+
+    <!-- Windows Service olarak calistirmak icin -->
+    <PackageReference Include="Topshelf" Version="4.3.0" />
+    <PackageReference Include="Topshelf.NLog" Version="4.3.0" />
+
+    <!-- WebSocket -->
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+
+    <!-- Logging -->
+    <PackageReference Include="NLog" Version="5.3.4" />
+    <PackageReference Include="NLog.Config" Version="4.7.15" />
+
+    <!-- Config -->
+    <PackageReference Include="System.Configuration.ConfigurationManager" Version="8.0.1" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,83 @@
+server:
+  port: 8443
+  ssl:
+    enabled: false  # Prod'da true yapilmali
+    # key-store: classpath:keystore.p12
+    # key-store-password: ${SSL_KEYSTORE_PASSWORD}
+    # key-store-type: PKCS12
+
+spring:
+  application:
+    name: sfb-ucwa-spring
+  jackson:
+    default-property-inclusion: non_null
+    serialization:
+      write-dates-as-timestamps: false
+
+# ──── SfB UCWA Konfigurasyonu ────
+sfb:
+  ucwa:
+    # On-premises SfB Server
+    autodiscover-url: ${SFB_AUTODISCOVER_URL:https://lyncdiscover.yourdomain.com}
+    token-url: ${SFB_TOKEN_URL:https://adfs.yourdomain.com/adfs/oauth2/token}
+    client-id: ${SFB_CLIENT_ID:your-client-id}
+    client-secret: ${SFB_CLIENT_SECRET:your-client-secret}
+    resource: ${SFB_RESOURCE:https://lyncdiscover.yourdomain.com}
+    redirect-uri: ${SFB_REDIRECT_URI:https://localhost:8443/callback}
+    application-user-agent: SfbUcwaSpringApp
+    culture: tr-TR
+    event-polling-interval-ms: 2000
+    event-timeout-seconds: 180
+    max-reconnect-attempts: 5
+    on-premises: true
+    trust-all-certificates: false
+
+  # ──── Recording & STT Pipeline ────
+  recording:
+    enabled: ${RECORDING_ENABLED:true}
+    watch-dir: ${RECORDING_WATCH_DIR:/mnt/sfb-recordings}
+    processed-dir: ${RECORDING_PROCESSED_DIR:/mnt/sfb-recordings/processed}
+    failed-dir: ${RECORDING_FAILED_DIR:/mnt/sfb-recordings/failed}
+    temp-dir: ${RECORDING_TEMP_DIR:/tmp/sfb-audio}
+    watch-extensions:
+      - .wav
+      - .mp3
+      - .wma
+      - .mp4
+    file-stability-wait-seconds: 5
+    max-concurrent-processing: 10
+    stt-service-url: ${STT_SERVICE_URL:http://localhost:8000/v1/audio/transcriptions}
+    stt-api-key: ${STT_API_KEY:}
+    stt-language: ${STT_LANGUAGE:tr}
+    stt-model: ${STT_MODEL:whisper-large-v3}
+    stt-timeout-seconds: 300
+    ffmpeg-path: ${FFMPEG_PATH:ffmpeg}
+    target-sample-rate: 16000
+    target-channels: 1
+
+# ──── Actuator ────
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,env
+  endpoint:
+    health:
+      show-details: when-authorized
+
+# ──── Logging ────
+logging:
+  level:
+    root: INFO
+    com.databoss.sfbucwa: DEBUG
+    org.springframework.web.reactive.function.client: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+
+# ──── Swagger / OpenAPI ────
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method

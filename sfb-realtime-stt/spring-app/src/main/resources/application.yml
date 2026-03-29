@@ -1,0 +1,49 @@
+server:
+  port: 8480
+
+spring:
+  application:
+    name: sfb-realtime-stt
+  threads:
+    virtual:
+      enabled: true  # Tomcat request handler'lari da Virtual Thread kullanir
+
+# ──── Streaming Konfigurasyonu ────
+streaming:
+  # Her N saniyede bir buffer'i STT'ye gonder
+  flush-interval: ${FLUSH_INTERVAL:PT3S}
+
+  # Minimum flush boyutu (byte) — bu kadar birikmeden gonderilmez
+  # 16000 byte = ~0.5s @ 16kHz 16bit mono
+  min-flush-size-bytes: ${MIN_FLUSH_BYTES:16000}
+
+  # Maksimum buffer boyutu — asilirsa zorla flush
+  # 960000 byte = ~30s
+  max-buffer-size-bytes: 960000
+
+  # External STT servisi
+  stt-service-url: ${STT_SERVICE_URL:http://localhost:9090}
+  stt-endpoint-path: ${STT_ENDPOINT_PATH:/api/v1/transcribe}
+  stt-api-key: ${STT_API_KEY:}
+  stt-timeout: PT30S
+
+  # Partial transkriptleri birlestir
+  accumulate-transcripts: true
+
+# ──── Actuator ────
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+
+# ──── Logging ────
+logging:
+  level:
+    root: INFO
+    com.databoss.sfbstream: DEBUG
+
+# ──── Swagger ────
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html

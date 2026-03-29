@@ -1,0 +1,112 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sfb-ucwa-spring
+  namespace: sfb
+  labels:
+    app: sfb-ucwa-spring
+spec:
+  replicas: 1  # UCWA application session-bound oldugundan tek replica onerilir
+  selector:
+    matchLabels:
+      app: sfb-ucwa-spring
+  template:
+    metadata:
+      labels:
+        app: sfb-ucwa-spring
+    spec:
+      containers:
+        - name: sfb-ucwa-spring
+          image: registry.data-boss.com.tr/sfb-ucwa-spring:latest
+          ports:
+            - containerPort: 8443
+              name: http
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: "prod"
+            - name: SFB_AUTODISCOVER_URL
+              valueFrom:
+                secretKeyRef:
+                  name: sfb-ucwa-secrets
+                  key: autodiscover-url
+            - name: SFB_TOKEN_URL
+              valueFrom:
+                secretKeyRef:
+                  name: sfb-ucwa-secrets
+                  key: token-url
+            - name: SFB_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: sfb-ucwa-secrets
+                  key: client-id
+            - name: SFB_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: sfb-ucwa-secrets
+                  key: client-secret
+            - name: SFB_RESOURCE
+              valueFrom:
+                secretKeyRef:
+                  name: sfb-ucwa-secrets
+                  key: resource
+            - name: STT_SERVICE_URL
+              value: "http://stt-service.sfb.svc.cluster.local:8000/v1/audio/transcriptions"
+            - name: STT_LANGUAGE
+              value: "tr"
+            - name: RECORDING_WATCH_DIR
+              value: "/mnt/sfb-recordings"
+          volumeMounts:
+            - name: sfb-recordings
+              mountPath: /mnt/sfb-recordings
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8443
+            initialDelaySeconds: 45
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8443
+            initialDelaySeconds: 30
+            periodSeconds: 10
+      imagePullSecrets:
+        - name: registry-creds
+      volumes:
+        - name: sfb-recordings
+          persistentVolumeClaim:
+            claimName: sfb-recordings-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sfb-ucwa-spring
+  namespace: sfb
+spec:
+  selector:
+    app: sfb-ucwa-spring
+  ports:
+    - port: 8443
+      targetPort: 8443
+      name: http
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: sfb-ucwa-secrets
+  namespace: sfb
+type: Opaque
+stringData:
+  autodiscover-url: "https://lyncdiscover.yourdomain.com"
+  token-url: "https://adfs.yourdomain.com/adfs/oauth2/token"
+  client-id: "your-client-id"
+  client-secret: "your-client-secret"
+  resource: "https://lyncdiscover.yourdomain.com"

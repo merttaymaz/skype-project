@@ -1,0 +1,15 @@
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+sfb:
+  ucwa:
+    trust-all-certificates: true  # Dev ortaminda self-signed cert'leri kabul et
+    event-polling-interval-ms: 5000
+
+logging:
+  level:
+    com.databoss.sfbucwa: TRACE
+    org.springframework.web.reactive.function.client: TRACE
+    reactor.netty.http.client: DEBUG
