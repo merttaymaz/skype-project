@@ -1,19 +1,3 @@
-## Build stage
-FROM eclipse-temurin:21-jdk-jammy AS builder
-
-WORKDIR /app
-
-COPY gradle/ gradle/
-COPY gradlew build.gradle.kts settings.gradle.kts ./
-
-# Dependency cache layer
-RUN chmod +x gradlew && ./gradlew dependencies --no-daemon || true
-
-COPY src/ src/
-
-RUN ./gradlew bootJar --no-daemon -x test
-
-## Runtime stage
 FROM eclipse-temurin:21-jre-jammy
 
 LABEL maintainer="databoss"
@@ -27,7 +11,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg curl \
 
 WORKDIR /app
 
-COPY --from=builder /app/build/libs/sfb-ucwa-spring.jar app.jar
+COPY build/libs/sfb-ucwa-spring.jar app.jar
 
 RUN chown -R appuser:appuser /app
 

@@ -1,15 +1,7 @@
-FROM eclipse-temurin:21-jdk-jammy AS builder
-WORKDIR /app
-COPY gradle/ gradle/
-COPY gradlew build.gradle.kts settings.gradle.kts ./
-RUN chmod +x gradlew && ./gradlew dependencies --no-daemon || true
-COPY src/ src/
-RUN ./gradlew bootJar --no-daemon -x test
-
 FROM eclipse-temurin:21-jre-jammy
 RUN groupadd -r appuser && useradd -r -g appuser -d /app -s /sbin/nologin appuser
 WORKDIR /app
-COPY --from=builder /app/build/libs/sfb-recording-forwarder.jar app.jar
+COPY build/libs/sfb-recording-forwarder.jar app.jar
 
 # Kayit dizinleri
 RUN mkdir -p /mnt/sfb-recordings/processed /mnt/sfb-recordings/failed \
