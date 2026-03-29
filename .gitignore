@@ -7,6 +7,8 @@ out/
 *.jar
 !gradle/wrapper/gradle-wrapper.jar
 !sfb-ucwa-spring/gradle/wrapper/gradle-wrapper.jar
+!sfb-recording-forwarder/gradle/wrapper/gradle-wrapper.jar
+!sfb-realtime-stt/spring-app/gradle/wrapper/gradle-wrapper.jar
 *.war
 
 # .NET
